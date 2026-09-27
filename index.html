@@ -858,7 +858,7 @@ body.home-view{background:#f4f7fb;overflow-x:hidden}
     <form class="form" onsubmit="addEmployee(event)">
       <div class="row"><input id="eName" class="input" required placeholder="اسم الموظف"><input id="eUser" class="input" required placeholder="اسم المستخدم"></div>
       <div class="row"><input id="ePass" class="input" type="password" required placeholder="كلمة المرور"><select id="eRole" class="input"><option value="موظف">موظف</option><option value="مشرف">مشرف</option></select></div>
-      <div class="row"><label><input type="checkbox" id="pSales" checked> المبيعات</label><label><input type="checkbox" id="pCustomers" checked> الزبائن</label><label><input type="checkbox" id="pRepair"> الصيانة</label><label><input type="checkbox" id="pLines"> الخطوط</label><label><input type="checkbox" id="pInstallment"> التقسيط</label></div>
+      <div class="row"><label><input type="checkbox" id="pSales" checked> المبيعات</label><label><input type="checkbox" id="pCustomers" checked> الزبائن</label><label><input type="checkbox" id="pRepair"> الصيانة</label><label><input type="checkbox" id="pLines"> الخطوط</label><label><input type="checkbox" id="pInstallment"> التقسيط</label><label><input type="checkbox" id="pDeviceRecognition"> 📸 التعرّف على الجهاز</label></div>
       <button class="btn">إنشاء حساب الموظف</button>
     </form>
   </div>
@@ -1236,5 +1236,5 @@ body.home-view #home.refHome{width:100%!important;max-width:1536px!important;min
 })();
 </script>
 
-<script src="/compatibility.js" defer></script>
+<script src="/device-recognition.js" defer></script>
 </body>
