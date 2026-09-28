@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/ai/device-recognize.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/ai/device-recognize",
+      "destination": "/api/ai/device-recognize.js"
+    }
+  ]
+}
