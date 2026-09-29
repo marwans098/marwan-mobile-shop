@@ -854,14 +854,7 @@ body{background:#06152c!important;color:#eef7ff!important}
 
 <style id="marwan-discount-v11">.discountOld{display:inline-block;text-decoration:line-through;opacity:.65;font-size:12px;margin-inline-end:6px}.discountNew{font-weight:900;color:#ff3355}.discountBadge{display:inline-block;margin-top:4px;padding:4px 8px;border-radius:999px;background:#fff0f2;color:#d51f45;font-weight:900;font-size:11px}.discountTable input{min-width:120px}.discountTable td{vertical-align:middle}</style>
 <style id="marwan-home-control-v11">.adminQuickBtn{position:relative!important;z-index:20!important;pointer-events:auto!important;cursor:pointer!important;min-height:56px!important}.adminQuickBtn:active{transform:scale(.98)}#homeManagerCard{scroll-margin-top:18px}</style>
-<style>.mrCatManagerOnly{display:none!important}.mr-manager .mrCatManagerOnly{display:block!important}</style><style id="marwan-home-direct-edit-v1">
-.mrHomeImageEdit{display:none!important;position:absolute!important;top:8px!important;right:8px!important;z-index:2147483646!important;border:2px solid #fff!important;border-radius:999px!important;padding:8px 12px!important;background:#086cff!important;color:#fff!important;font-weight:900!important;font-size:13px!important;line-height:1!important;box-shadow:0 4px 16px rgba(0,0,0,.45)!important;cursor:pointer!important;pointer-events:auto!important;touch-action:manipulation!important}
-.mr-manager .mrHomeImageEdit{display:block!important}
-.mrHomeEditHost{position:relative!important;overflow:visible!important}
-.mrHomeImageEdit:active{transform:scale(.94)!important}
-.mr-manager .refCategories .refCat,.mr-manager .refHero,.mr-manager .refServices,.mr-manager .refPromo,.mr-manager .refBottomBanners>div{position:relative!important}
-</style>
-</head>
+<style>.mrCatManagerOnly{display:none!important}.mr-manager .mrCatManagerOnly{display:block!important}</style></head>
 <body class="home-view">
 
 <!-- FINAL DESIGN: reference storefront only; no legacy header -->
@@ -1072,7 +1065,7 @@ body{background:#06152c!important;color:#eef7ff!important}
 <div class="card" style="margin-top:12px"><h3>الأقسام الخاصة</h3><div class="adminQuickGrid">
 <button class="adminQuickBtn" onclick="show('installment')"><span>💳</span>إدارة الأقساط</button>
 <button class="adminQuickBtn" onclick="show('employees')"><span>👨‍💼</span>إدارة الموظفين</button>
-<button class="adminQuickBtn" type="button" onclick="openHomeManager()" ><span>🖼️</span>تحكم بالواجهة الرئيسية</button>
+<button class="adminQuickBtn" type="button" onclick="marwanV15HomeControl()" ><span>🖼️</span>تحكم بالواجهة الرئيسية</button>
 <button class="adminQuickBtn" type="button" onclick="marwanV15DiscountControl()"><span>🏷️</span>إدارة الخصومات</button>
 </div></div>
 <div class="card" id="homeManagerCard" style="margin-top:12px"><div class="brand"><h3>التحكم بالواجهة الرئيسية</h3><button class="btn" type="button" onclick="renderHomeManager()">تحديث</button></div><div id="homeManager"></div></div>
@@ -1304,76 +1297,6 @@ function openHomeManager(){
   if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function mrOpenHomeImagePicker(key){
-  if(!isManager()){toast('هذا الخيار للمدير فقط');return}
-  const input=document.createElement('input');
-  input.type='file'; input.accept='image/*';
-  input.onchange=()=>{if(input.files&&input.files[0])changeHomeImage(key,input)};
-  input.click();
-}
-function mrAddHomeImageEditButtons(){
-  const home=document.getElementById('home'); if(!home)return;
-  home.querySelectorAll('.mrHomeImageEdit').forEach(x=>x.remove());
-  if(!isManager())return;
-  const addBtn=(img,key,label)=>{
-    if(!img||!img.parentElement)return;
-    const parent=img.parentElement;
-    parent.classList.add('mrHomeEditHost');
-    const b=document.createElement('button');
-    b.type='button'; b.className='mrHomeImageEdit'; b.textContent='✏️ تعديل'; b.title=label;
-    b.setAttribute('aria-label',label);
-    b.style.cssText='display:block!important;position:absolute!important;top:8px!important;right:8px!important;z-index:2147483646!important;pointer-events:auto!important;';
-    b.onclick=e=>{e.preventDefault();e.stopPropagation();mrOpenHomeImagePicker(key)};
-    b.addEventListener('pointerdown',e=>e.stopPropagation(),{passive:true});
-    parent.appendChild(b);
-  };
-  home.querySelectorAll('.refCategories .refCat img').forEach((img,i)=>{
-    if(!img||!img.parentElement)return;
-    const parent=img.parentElement;
-    parent.classList.add('mrHomeEditHost');
-    const b=document.createElement('button');
-    b.type='button'; b.className='mrHomeImageEdit'; b.textContent='✏️ تعديل'; b.title='تعديل صورة واسم ومعلومات القسم '+(i+1);
-    b.setAttribute('aria-label','تعديل صورة واسم ومعلومات القسم '+(i+1));
-    b.style.cssText='display:block!important;position:absolute!important;top:8px!important;right:8px!important;z-index:2147483646!important;pointer-events:auto!important;';
-    b.onclick=e=>{
-      e.preventDefault();e.stopPropagation();
-      try{
-        if(typeof mrEnsure==='function') mrEnsure();
-        let cats=(typeof mrCategories==='function')?mrCategories():[];
-        const tile=img.closest ? img.closest('.refCat') : null;
-        // Dynamic category tiles carry their real category name in data-category.
-        // Prefer that value so the Edit button cannot point at the wrong category.
-        let name=(tile && tile.dataset && tile.dataset.category) ? tile.dataset.category : (cats[i]||'');
-        // The original reference tiles do not carry a category name in their HTML.
-        // If no product category exists at this index, create a stable manager record
-        // so the same Edit button always opens the full name/description/image editor.
-        if(!name){
-          name='قسم '+(i+1);
-          db.categoryMeta=db.categoryMeta&&typeof db.categoryMeta==='object'&&!Array.isArray(db.categoryMeta)?db.categoryMeta:{};
-          if(!db.categoryMeta[name]) db.categoryMeta[name]={name:name,image:'',gallery:[],description:'',active:true};
-          if(typeof save==='function') save();
-          cats=(typeof mrCategories==='function')?mrCategories():cats;
-        }
-        if(typeof openCategoryManager==='function'){
-          openCategoryManager(name);
-        }else{
-          toast('جارٍ تجهيز معلومات القسم، جرّب الزر مرة ثانية');
-        }
-      }catch(err){
-        console.error(err);
-        toast('تعذر فتح معلومات القسم');
-      }
-    };
-    b.addEventListener('pointerdown',e=>e.stopPropagation(),{passive:true});
-    b.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
-    parent.appendChild(b);
-  });
-  addBtn(home.querySelector('.refHero img'),'hero','تعديل الصورة الرئيسية');
-  addBtn(home.querySelector('.refServices img'),'services','تعديل صورة الخدمات');
-  addBtn(home.querySelector('.refPromo img'),'promo','تعديل صورة الخطوط والعروض');
-  home.querySelectorAll('.refBottomBanners img').forEach((img,i)=>addBtn(img,'bottom'+i,'تعديل البانر السفلي '+(i+1)));
-}
-
 function renderHomeManager(){
   const el=document.getElementById('homeManager'); if(!el)return;
   if(!isManager()){el.innerHTML='<div class="muted">التحكم بالواجهة الرئيسية للمدير فقط.</div>';return}
@@ -1408,7 +1331,7 @@ function renderHomeManager(){
                 <b>${esc(x.title)}</b>
                 <div class="muted" style="font-size:12px;margin-top:4px">${esc(x.desc)}</div>
                 <div class="actions" style="margin-top:8px">
-                  <label class="btn" style="display:inline-block;cursor:pointer">✏️ تعديل الصورة
+                  <label class="btn" style="display:inline-block;cursor:pointer">اختيار صورة
                     <input type="file" accept="image/*" hidden onchange="changeHomeImage('${x.key}',this)">
                   </label>
                   <button class="btn secondary" type="button" onclick="resetHomeImage('${x.key}')">إرجاع الأصل</button>
@@ -1701,7 +1624,7 @@ function resetCustomerPassword(){
  x.account=x.account||{};x.account.username=u;x.account.password=pass;x.username=u;x.password=pass;save();if(msg)msg.textContent='تم تغيير كلمة السر بنجاح ✅';setTimeout(()=>document.getElementById('forgotPasswordModal')?.remove(),900);
 }
 function resetEmployeePassword(){
- const u=(document.getElementById('fpEmpUser')?.value||'').trim(),code=(document.getElementById('fpCode')?.value||'').trim(),pass=document.getElementById('fpEmpNewPass')?.value||'',msg=document.getElementById('fpMsg');
+ const u=(document.getElementById('fpUser')?.value||'').trim(),code=(document.getElementById('fpCode')?.value||'').trim(),pass=document.getElementById('fpNewPass')?.value||'',msg=document.getElementById('fpMsg');
  if(!u||!/^\d{6}$/.test(code)||pass.length<4){if(msg)msg.textContent='أكمل البيانات: رمز الاسترجاع 6 أرقام وكلمة السر 4 أحرف/أرقام على الأقل.';return}
  const x=db.employees.find(a=>a.username===u&&a.active!==false);
  if(!x||String(x.recoveryCode||'')!==code){if(msg)msg.textContent='اسم المستخدم أو رمز الاسترجاع غير صحيح.';return}
@@ -1925,7 +1848,7 @@ function applyEmployeePermissions(){
  applySectionEditMode();
 }
 function clearData(){if(!isManager()){toast('هذه العملية للمدير فقط');return}if(confirm('سيتم حذف البيانات المحلية والبدء من جديد.')){localStorage.removeItem(KEY);location.reload()}}
-(async()=>{try{const localSnapshot=JSON.parse(localStorage.getItem(KEY)||'null')||{};const remote=await API.request('/public-state');if(remote&&Array.isArray(remote.products)){const keepHome=localSnapshot.homeMedia??db.homeMedia;const keepCustom=localSnapshot.homeCustomSections??db.homeCustomSections;const keepCategoryMeta=localSnapshot.categoryMeta??db.categoryMeta;const keepHomeTileMeta=localSnapshot.homeTileMeta??db.homeTileMeta;const keepProducts=localSnapshot.products??db.products;db=Object.assign(db,remote);if(keepHome!==undefined)db.homeMedia=keepHome;if(keepCustom!==undefined)db.homeCustomSections=keepCustom;if(keepCategoryMeta!==undefined)db.categoryMeta=keepCategoryMeta;if(keepHomeTileMeta!==undefined)db.homeTileMeta=keepHomeTileMeta;if(Array.isArray(keepProducts))db.products=keepProducts;localStorage.setItem(KEY,JSON.stringify(db));}}catch(e){}applyHomeMedia();renderCustomHomeSections();renderProducts();renderSales();renderCustomers();renderRepairs();renderLines();renderLineAccounts();renderInstallments()})();
+(async()=>{try{const localSnapshot=JSON.parse(localStorage.getItem(KEY)||'null')||{};const remote=await API.request('/public-state');if(remote&&Array.isArray(remote.products)){const keepHome=localSnapshot.homeMedia??db.homeMedia;const keepCustom=localSnapshot.homeCustomSections??db.homeCustomSections;const keepCategoryMeta=localSnapshot.categoryMeta??db.categoryMeta;const keepProducts=localSnapshot.products??db.products;db=Object.assign(db,remote);if(keepHome!==undefined)db.homeMedia=keepHome;if(keepCustom!==undefined)db.homeCustomSections=keepCustom;if(keepCategoryMeta!==undefined)db.categoryMeta=keepCategoryMeta;if(Array.isArray(keepProducts))db.products=keepProducts;localStorage.setItem(KEY,JSON.stringify(db));}}catch(e){}applyHomeMedia();renderCustomHomeSections();renderProducts();renderSales();renderCustomers();renderRepairs();renderLines();renderLineAccounts();renderInstallments()})();
 </script>
 
 <style id="exactReferenceOverride">
@@ -2678,10 +2601,7 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
     cats.forEach(function(c){
       var m=mrCategoryMeta(c);var tile=document.createElement('div');tile.className='refCat mrDynamicCatTile';tile.dataset.category=c;tile.onclick=function(){window.mrActiveCategory=c;show('shop');if(typeof renderProducts==='function')renderProducts()};
       tile.innerHTML=(m.image?'<img src="'+m.image.replace(/"/g,'&quot;')+'" alt="'+mrEsc(c)+'">':'<div style="height:100%;min-height:130px;background:linear-gradient(135deg,#0a2d67,#0b63df);display:grid;place-items:center;color:#fff;font-weight:900;padding:12px;text-align:center">'+mrEsc(c)+'</div>')+'<button type="button" class="mrCatAdminBtn mrCatManagerOnly" title="معلومات القسم">⚙</button>';
-      var adminBtn=tile.querySelector('.mrCatAdminBtn');
-      adminBtn.onclick=function(e){e.preventDefault();e.stopPropagation();window.openCategoryManager(c)};
-      adminBtn.addEventListener('pointerdown',function(e){e.stopPropagation()},{passive:true});
-      adminBtn.addEventListener('touchstart',function(e){e.stopPropagation()},{passive:true});
+      tile.querySelector('.mrCatAdminBtn').onclick=function(e){e.stopPropagation();openCategoryManager(c)};
       wrap.appendChild(tile);
     });
   }
@@ -2713,7 +2633,7 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
 
   function ensureModal(){
     if(document.getElementById('mrCategoryModal'))return;
-    var d=document.createElement('div');d.id='mrCategoryModal';d.className='mrCategoryModal';d.innerHTML='<div class="mrCategoryModalBox" role="dialog" aria-modal="true"><div class="mrCategoryModalHead"><h2 id="mrCatTitle">معلومات القسم</h2><button type="button" class="btn red" onclick="closeCategoryManager()">إغلاق</button></div><div class="mrCategoryGrid"><div class="full"><img id="mrCatPreview" class="mrCategoryPreview" alt="صورة القسم"></div><div class="full"><label>اسم القسم</label><input id="mrCatName" class="input" placeholder="اسم القسم"></div><div class="full"><label>وصف القسم</label><textarea id="mrCatDesc" class="input" rows="3" placeholder="وصف مختصر للقسم"></textarea></div><div class="full" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(31,168,255,.25);border-radius:12px;background:rgba(31,168,255,.06)"><input id="mrCatActive" type="checkbox" style="width:22px;height:22px"><label for="mrCatActive" style="margin:0;cursor:pointer;font-weight:900">👁️ إظهار القسم في الواجهة الرئيسية وشريط الأقسام</label></div><div><label>صورة رئيسية للقسم</label><label class="btn" style="width:100%;text-align:center;cursor:pointer">📷 اختيار صورة<input id="mrCatImage" type="file" accept="image/*" hidden></label></div><div><label>إضافة صور للقسم</label><label class="btn secondary" style="width:100%;text-align:center;cursor:pointer">➕ صور إضافية<input id="mrCatGalleryInput" type="file" accept="image/*" multiple hidden></label></div><div class="full"><div class="mrCategoryGallery" id="mrCatGallery"></div></div><div class="full"><div class="mrCategoryTools"><button type="button" class="btn" onclick="saveCategoryManager()">💾 حفظ وتحديث الآن</button><button type="button" class="btn" onclick="publishManagerChanges()">🚀 نشر التغييرات</button><button type="button" class="btn secondary" onclick="addProductFromCategory()">➕ إضافة جهاز لهذا القسم</button><button type="button" class="btn red" onclick="deleteCurrentCategory()">🗑️ حذف القسم</button></div></div><div class="full mrCategoryHint">ملاحظة: حذف القسم لا يحذف الأجهزة؛ الأجهزة تنتقل إلى قسم «عام» حتى لا تضيع بياناتها.</div></div></div>';
+    var d=document.createElement('div');d.id='mrCategoryModal';d.className='mrCategoryModal';d.innerHTML='<div class="mrCategoryModalBox" role="dialog" aria-modal="true"><div class="mrCategoryModalHead"><h2 id="mrCatTitle">معلومات القسم</h2><button type="button" class="btn red" onclick="closeCategoryManager()">إغلاق</button></div><div class="mrCategoryGrid"><div class="full"><img id="mrCatPreview" class="mrCategoryPreview" alt="صورة القسم"></div><div class="full"><label>اسم القسم</label><input id="mrCatName" class="input" placeholder="اسم القسم"></div><div class="full"><label>وصف القسم</label><textarea id="mrCatDesc" class="input" rows="3" placeholder="وصف مختصر للقسم"></textarea></div><div><label>صورة رئيسية للقسم</label><label class="btn" style="width:100%;text-align:center;cursor:pointer">📷 اختيار صورة<input id="mrCatImage" type="file" accept="image/*" hidden></label></div><div><label>إضافة صور للقسم</label><label class="btn secondary" style="width:100%;text-align:center;cursor:pointer">➕ صور إضافية<input id="mrCatGalleryInput" type="file" accept="image/*" multiple hidden></label></div><div class="full"><div class="mrCategoryGallery" id="mrCatGallery"></div></div><div class="full"><div class="mrCategoryTools"><button type="button" class="btn" onclick="saveCategoryManager()">💾 حفظ وتحديث الآن</button><button type="button" class="btn" onclick="publishManagerChanges()">🚀 نشر التغييرات</button><button type="button" class="btn secondary" onclick="addProductFromCategory()">➕ إضافة جهاز لهذا القسم</button><button type="button" class="btn red" onclick="deleteCurrentCategory()">🗑️ حذف القسم</button></div></div><div class="full mrCategoryHint">ملاحظة: حذف القسم لا يحذف الأجهزة؛ الأجهزة تنتقل إلى قسم «عام» حتى لا تضيع بياناتها.</div></div></div>';
     d.addEventListener('click',function(e){if(e.target===d)closeCategoryManager()});document.body.appendChild(d);
     document.getElementById('mrCatImage').addEventListener('change',function(){var f=this.files&&this.files[0];if(!f)return;readImageFile(this,function(src){d.dataset.pendingImage=src;document.getElementById('mrCatPreview').src=src})});
     document.getElementById('mrCatGalleryInput').addEventListener('change',function(){var files=Array.from(this.files||[]);if(!files.length)return;var left=files.length;var out=[];files.forEach(function(f){var fake={files:[f]};readImageFile(fake,function(src){out.push(src);left--;if(left===0){d.dataset.pendingGallery=JSON.stringify(out);var m=mrCategoryMeta(d.dataset.category);m.gallery=(m.gallery||[]).concat(out);mrRenderGallery(d.dataset.category);}})})});
@@ -2721,7 +2641,7 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
 
   window.openCategoryManager=function(name){
     if(!mrManager()){toast('معلومات القسم للمدير فقط');return}
-    ensureModal();mrEnsure();var names=mrCategories();if(!name)name=names[0]||'عام';var m=mrCategoryMeta(name);var d=document.getElementById('mrCategoryModal');d.dataset.category=name;d.dataset.pendingImage='';d.dataset.pendingGallery='';document.getElementById('mrCatTitle').textContent='⚙ معلومات القسم — '+name;document.getElementById('mrCatName').value=m.name||name;document.getElementById('mrCatDesc').value=m.description||'';document.getElementById('mrCatActive').checked=m.active!==false;document.getElementById('mrCatPreview').src=m.image||'';mrRenderGallery(name);d.classList.add('show');
+    ensureModal();mrEnsure();var names=mrCategories();if(!name)name=names[0]||'عام';var m=mrCategoryMeta(name);var d=document.getElementById('mrCategoryModal');d.dataset.category=name;d.dataset.pendingImage='';d.dataset.pendingGallery='';document.getElementById('mrCatTitle').textContent='⚙ معلومات القسم — '+name;document.getElementById('mrCatName').value=m.name||name;document.getElementById('mrCatDesc').value=m.description||'';document.getElementById('mrCatPreview').src=m.image||'';mrRenderGallery(name);d.classList.add('show');
   };
   window.closeCategoryManager=function(){var d=document.getElementById('mrCategoryModal');if(d)d.classList.remove('show')};
   window.publishManagerChanges=async function(){
@@ -2752,7 +2672,7 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
   window.saveCategoryManager=function(){
     if(!mrManager())return;var d=document.getElementById('mrCategoryModal');if(!d)return;var oldName=d.dataset.category||'عام',m=mrCategoryMeta(oldName),newName=(document.getElementById('mrCatName').value||'').trim()||oldName,desc=(document.getElementById('mrCatDesc').value||'').trim();
     if(newName!==oldName){if(db.categoryMeta[newName]&&newName!==oldName){toast('هذا الاسم مستخدم لقسم آخر');return}db.products.forEach(function(p){if(String(p.category||'عام').trim()===oldName)p.category=newName});db.categoryMeta[newName]=m;delete db.categoryMeta[oldName];m.name=newName}
-    m.name=newName;m.description=desc;m.active=document.getElementById('mrCatActive')?.checked!==false;if(d.dataset.pendingImage)m.image=d.dataset.pendingImage;m.gallery=Array.isArray(m.gallery)?m.gallery:[];save();mrEnsure();mrRenderDynamicNav();mrRenderCategoryTiles();if(typeof renderProducts==='function')renderProducts();if(typeof renderAdmin==='function')renderAdmin();applyHomeMedia();renderCustomHomeSections();closeCategoryManager();toast('تم حفظ القسم وتحديث الموقع مباشرة ✅');
+    m.name=newName;m.description=desc;m.active=true;if(d.dataset.pendingImage)m.image=d.dataset.pendingImage;m.gallery=Array.isArray(m.gallery)?m.gallery:[];save();mrEnsure();mrRenderDynamicNav();mrRenderCategoryTiles();if(typeof renderProducts==='function')renderProducts();if(typeof renderAdmin==='function')renderAdmin();applyHomeMedia();renderCustomHomeSections();closeCategoryManager();toast('تم حفظ القسم وتحديث الموقع مباشرة ✅');
   };
   window.removeCategoryGallery=function(name,i){if(!mrManager())return;var m=mrCategoryMeta(name);if(!Array.isArray(m.gallery))return;m.gallery.splice(i,1);save();mrRenderGallery(name);toast('تم حذف الصورة من القسم');};
   window.deleteCurrentCategory=function(){
@@ -2779,7 +2699,7 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
   };
 
   function mrRefresh(){
-    try{mrEnsure();mrApplyManagerClass();mrRenderProductCards();mrRenderDynamicNav();mrRenderCategoryTiles();mrAddCategoryPencil();mrAddHomeImageEditButtons();if(typeof renderProducts==='function')renderProducts();}catch(e){console.error('V19 category manager',e)}
+    try{mrEnsure();mrApplyManagerClass();mrRenderProductCards();mrRenderDynamicNav();mrRenderCategoryTiles();mrAddCategoryPencil();if(typeof renderProducts==='function')renderProducts();}catch(e){console.error('V19 category manager',e)}
   }
   // Re-run after login and whenever manager UI is opened.
   var oldLogin=window.login;if(typeof oldLogin==='function'){window.login=async function(e){var r=await oldLogin(e);setTimeout(mrRefresh,50);return r}}
@@ -2787,9 +2707,6 @@ body.mr-manager .mrCatManagerOnly{display:inline-flex!important}
   var oldRenderAdmin=window.renderAdmin;if(typeof oldRenderAdmin==='function'){window.renderAdmin=function(){var r=oldRenderAdmin.apply(this,arguments);setTimeout(mrRefresh,0);return r}}
   document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('button');if(!b)return;if(b.textContent&&b.textContent.includes('تحكم بالواجهة الرئيسية'))setTimeout(mrRefresh,30)},true);
   setTimeout(mrRefresh,80);
-  setTimeout(mrRefresh,400);
-  setTimeout(mrRefresh,1200);
-  setTimeout(mrRefresh,2500);
 })();
 </script>
 <script id="marwan-v23-complete-modules">(function(){
@@ -3084,102 +3001,6 @@ const timer=setInterval(()=>{if(typeof window.renderHomeManager==='function'){pa
   };
   function add(){const actions=document.querySelector('#dashboard .actions');if(!actions||actions.querySelector('[data-comprehensive-report]'))return;const b=document.createElement('button');b.className='btn secondary';b.dataset.comprehensiveReport='1';b.textContent='📊 التقارير الشاملة';b.onclick=openComprehensiveReports;actions.appendChild(b);}
   const old=window.renderAdmin;if(typeof old==='function')window.renderAdmin=function(){old();add();};setTimeout(add,500);
-})();
-</script>
-
-<style id="mr-home-tile-editor-v1">
-.mrHomeTileModal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:14px;z-index:2147483647}
-.mrHomeTileModal.show{display:flex}
-.mrHomeTileBox{width:min(620px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#061d43,#082958);color:#fff;border:1px solid rgba(35,160,255,.55);border-radius:24px;padding:16px;box-shadow:0 25px 100px #0009}
-.mrHomeTileHead{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-16px;background:#061d43;padding:4px 0 12px;z-index:2}
-.mrHomeTileHead h2{margin:0;font-size:21px}
-.mrHomeTilePreview{width:100%;aspect-ratio:16/7;object-fit:cover;border-radius:15px;background:#03132d;border:1px solid rgba(31,168,255,.35);margin-bottom:12px}
-.mrHomeTileGrid{display:grid;gap:10px}
-.mrHomeTileGrid label{font-weight:900;font-size:13px}
-.mrHomeTileGrid input,.mrHomeTileGrid textarea{width:100%;box-sizing:border-box}
-.mrHomeTileActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.mrHomeTileActions button{flex:1;min-width:140px}
-</style>
-<script id="mr-home-tile-editor-v1">
-(function(){
-  'use strict';
-  function manager(){return typeof isManager==='function'&&isManager()}
-  function esc2(v){return typeof esc==='function'?esc(v==null?'':String(v)):String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-  function ensureMeta(){
-    db.homeTileMeta=Array.isArray(db.homeTileMeta)?db.homeTileMeta:[];
-    for(var i=0;i<4;i++){
-      if(!db.homeTileMeta[i]||typeof db.homeTileMeta[i]!=='object')db.homeTileMeta[i]={title:'قسم '+(i+1),description:'',visible:true};
-      db.homeTileMeta[i].title=String(db.homeTileMeta[i].title||('قسم '+(i+1)));
-      db.homeTileMeta[i].description=String(db.homeTileMeta[i].description||'');
-      db.homeTileMeta[i].visible=db.homeTileMeta[i].visible!==false;
-    }
-    return db.homeTileMeta;
-  }
-  function ensureModal(){
-    if(document.getElementById('mrHomeTileModal'))return;
-    var d=document.createElement('div');d.id='mrHomeTileModal';d.className='mrHomeTileModal';
-    d.innerHTML='<div class="mrHomeTileBox"><div class="mrHomeTileHead"><h2 id="mrHomeTileTitle">✏️ تعديل القسم</h2><button type="button" class="btn red" onclick="mrCloseHomeTileEditor()">إغلاق</button></div><img id="mrHomeTilePreview" class="mrHomeTilePreview" alt="صورة القسم"><div class="mrHomeTileGrid"><div><label>اسم القسم</label><input id="mrHomeTileName" class="input" maxlength="80" placeholder="اسم القسم"></div><div><label>معلومات / وصف القسم</label><textarea id="mrHomeTileDesc" class="input" rows="4" maxlength="500" placeholder="اكتب معلومات القسم هنا..."></textarea></div><div><label>الصورة الرئيسية</label><label class="btn" style="display:block;text-align:center;cursor:pointer;margin-top:6px">📷 تغيير الصورة<input id="mrHomeTileFile" type="file" accept="image/*" hidden></label></div><div><label>حالة القسم</label><label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input id="mrHomeTileVisible" type="checkbox" style="width:20px;height:20px"> إظهار القسم في الواجهة الرئيسية</label></div></div><div class="mrHomeTileActions"><button type="button" class="btn" onclick="mrSaveHomeTileEditor()">💾 حفظ التغييرات</button><button type="button" class="btn secondary" onclick="mrResetHomeTileImage()">↩️ إرجاع الصورة الأصلية</button></div></div>';
-    d.addEventListener('click',function(e){if(e.target===d)window.mrCloseHomeTileEditor()});document.body.appendChild(d);
-    document.getElementById('mrHomeTileFile').addEventListener('change',function(){var f=this.files&&this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){d.dataset.pendingImage=r.result;document.getElementById('mrHomeTilePreview').src=r.result};r.readAsDataURL(f)});
-  }
-  window.mrOpenHomeTileEditor=function(index,category){
-    if(!manager()){toast('هذا الخيار للمدير فقط');return}
-    ensureMeta();ensureModal();
-    var d=document.getElementById('mrHomeTileModal');
-    var cats=(typeof mrCategories==='function')?mrCategories():[];
-    category=String(category||'').trim();
-    var isDynamic=index>=4 || !!category;
-    if(isDynamic && !category){category=String((cats[index]||'')).trim()}
-    d.dataset.index=String(index);d.dataset.category=category;d.dataset.kind=isDynamic?'dynamic':'base';d.dataset.pendingImage='';
-    var name='',desc='',visible=true,img='';
-    if(isDynamic){
-      db.categoryMeta=(db.categoryMeta&&typeof db.categoryMeta==='object'&&!Array.isArray(db.categoryMeta))?db.categoryMeta:{};
-      var cm=db.categoryMeta[category];
-      if(!cm && category && typeof mrCategoryMeta==='function')cm=mrCategoryMeta(category);
-      cm=cm||{name:category||('قسم '+(index+1)),description:'',active:true,image:''};
-      name=cm.name||category||('قسم '+(index+1));desc=cm.description||'';visible=cm.active!==false;img=cm.image||'';
-    }else{
-      var m=db.homeTileMeta[index]||{title:'قسم '+(index+1),description:'',visible:true};
-      name=m.title||('قسم '+(index+1));desc=m.description||'';visible=m.visible!==false;
-      img=(db.homeMedia&&Array.isArray(db.homeMedia.categories)&&db.homeMedia.categories[index])||'';
-    }
-    document.getElementById('mrHomeTileTitle').textContent='✏️ تعديل '+name;
-    document.getElementById('mrHomeTileName').value=name;
-    document.getElementById('mrHomeTileDesc').value=desc;
-    document.getElementById('mrHomeTileVisible').checked=visible;
-    document.getElementById('mrHomeTilePreview').src=img||'';
-    document.getElementById('mrHomeTileFile').value='';
-    d.classList.add('show');
-  };
-  window.mrCloseHomeTileEditor=function(){var d=document.getElementById('mrHomeTileModal');if(d)d.classList.remove('show')};
-  window.mrResetHomeTileImage=function(){var d=document.getElementById('mrHomeTileModal');if(!d)return;d.dataset.pendingImage='';var i=Number(d.dataset.index||0),category=String(d.dataset.category||'').trim(),kind=d.dataset.kind||'base',img='';if(kind==='dynamic'){var cm=db.categoryMeta&&db.categoryMeta[category];img=cm&&cm.image||''}else{var defs=typeof homeMediaDefaults==='function'?homeMediaDefaults():{};var arr=Array.isArray(defs.categories)?defs.categories:[];img=arr[i]||''}document.getElementById('mrHomeTilePreview').src=img;document.getElementById('mrHomeTileFile').value=''};
-  window.mrSaveHomeTileEditor=function(){
-    if(!manager())return;var d=document.getElementById('mrHomeTileModal');if(!d)return;ensureMeta();
-    var i=Number(d.dataset.index||0),category=String(d.dataset.category||'').trim(),kind=d.dataset.kind||'base';
-    var name=(document.getElementById('mrHomeTileName').value||'').trim()||('قسم '+(i+1)),desc=(document.getElementById('mrHomeTileDesc').value||'').trim(),visible=document.getElementById('mrHomeTileVisible').checked;
-    if(kind==='dynamic'){
-      db.categoryMeta=(db.categoryMeta&&typeof db.categoryMeta==='object'&&!Array.isArray(db.categoryMeta))?db.categoryMeta:{};
-      var cm=db.categoryMeta[category]||(db.categoryMeta[category]={name:category,image:'',gallery:[],description:'',active:true});
-      cm.name=name;cm.description=desc;cm.active=visible;cm.gallery=Array.isArray(cm.gallery)?cm.gallery:[];
-      if(d.dataset.pendingImage)cm.image=d.dataset.pendingImage;
-      save();
-      if(typeof mrRenderCategoryTiles==='function')mrRenderCategoryTiles();
-      if(typeof mrRenderDynamicNav==='function')mrRenderDynamicNav();
-    }else{
-      var m=db.homeTileMeta[i]||(db.homeTileMeta[i]={title:'قسم '+(i+1),description:'',visible:true});m.title=name;m.description=desc;m.visible=visible;
-      db.homeMedia=db.homeMedia&&typeof db.homeMedia==='object'?db.homeMedia:{};db.homeMedia.categories=Array.isArray(db.homeMedia.categories)?db.homeMedia.categories:[];if(d.dataset.pendingImage)db.homeMedia.categories[i]=d.dataset.pendingImage;
-      save();if(typeof applyHomeMedia==='function')applyHomeMedia();
-      var tile=document.querySelectorAll('#home .refCategories .refCat')[i];if(tile)tile.style.display=visible?'':'none';
-    }
-    mrCloseHomeTileEditor();toast('تم حفظ اسم ومعلومات وصورة القسم ✅');if(typeof renderHomeManager==='function')renderHomeManager();if(typeof mrAddHomeImageEditButtons==='function')setTimeout(mrAddHomeImageEditButtons,50);
-  };
-  window.mrAddHomeImageEditButtons=function(){
-    var home=document.getElementById('home');if(!home)return;home.querySelectorAll('.mrHomeImageEdit').forEach(function(x){x.remove()});if(!manager())return;
-    home.querySelectorAll('.refCategories .refCat img').forEach(function(img,i){if(!img.parentElement)return;var p=img.parentElement;p.classList.add('mrHomeEditHost');var tile=p.closest('.refCat');var category=tile&&tile.dataset?String(tile.dataset.category||'').trim():'';if(!category)category=String(img.alt||'').trim();var b=document.createElement('button');b.type='button';b.className='mrHomeImageEdit';b.textContent='✏️ تعديل';b.title='تعديل اسم ومعلومات وصورة القسم '+(i+1);b.style.cssText='display:block!important;position:absolute!important;top:8px!important;right:8px!important;z-index:2147483646!important;pointer-events:auto!important;';b.onclick=function(e){e.preventDefault();e.stopPropagation();mrOpenHomeTileEditor(i,category)};b.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation()},{passive:false});b.addEventListener('touchstart',function(e){e.stopPropagation()},{passive:true});p.appendChild(b)});
-    var add=function(img,key,label){if(!img||!img.parentElement)return;var p=img.parentElement;p.classList.add('mrHomeEditHost');var b=document.createElement('button');b.type='button';b.className='mrHomeImageEdit';b.textContent='✏️ تعديل';b.title=label;b.style.cssText='display:block!important;position:absolute!important;top:8px!important;right:8px!important;z-index:2147483646!important;pointer-events:auto!important;';b.onclick=function(e){e.preventDefault();e.stopPropagation();mrOpenHomeImagePicker(key)};p.appendChild(b)};
-    add(home.querySelector('.refHero img'),'hero','تعديل الصورة الرئيسية');add(home.querySelector('.refServices img'),'services','تعديل صورة الخدمات');add(home.querySelector('.refPromo img'),'promo','تعديل صورة الخطوط والعروض');home.querySelectorAll('.refBottomBanners img').forEach(function(img,i){add(img,'bottom'+i,'تعديل البانر السفلي '+(i+1))});
-  };
-  ensureMeta();
 })();
 </script>
 </body>
