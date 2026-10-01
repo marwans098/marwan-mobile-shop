@@ -1303,21 +1303,21 @@ function applySectionEditMode(){
 function show(id){
  const target=document.getElementById(id);
  if(!target){toast('القسم المطلوب غير موجود حالياً');return}
- // الإدارة: الزائر يذهب أولاً إلى شاشة تسجيل الدخول، ولا تظهر لوحة الإدارة مباشرة.
+ // إصلاح زر الإدارة: الزائر/الموظف يشاهد شاشة دخول الإدارة، لكن لا يحصل على لوحة الإدارة بدون حساب مدير.
  if(id==='admin'&&!isManager()){
-  document.querySelectorAll('.section').forEach(x=>x.classList.remove('show'));
-  target.classList.add('show');
-  document.body.classList.remove('home-view');
-  const loginEl=document.getElementById('loginBox');
-  const dashEl=document.getElementById('dashboard');
-  if(loginEl)loginEl.style.display='block';
-  if(dashEl)dashEl.style.display='none';
-  const outerNav=document.querySelector('.container > .nav');
-  const topHeader=document.querySelector('body > .top');
-  if(topHeader)topHeader.style.display='none';
-  if(outerNav)outerNav.style.display='none';
-  window.scrollTo({top:0,behavior:'smooth'});
-  return;
+   document.querySelectorAll('.section').forEach(x=>x.classList.remove('show'));
+   target.classList.add('show');
+   document.body.classList.remove('home-view');
+   const loginEl=document.getElementById('loginBox');
+   const dashEl=document.getElementById('dashboard');
+   if(loginEl)loginEl.style.display='block';
+   if(dashEl)dashEl.style.display='none';
+   const topHeader=document.querySelector('body > .top');
+   const outerNav=document.querySelector('.container > .nav');
+   if(topHeader)topHeader.style.display='none';
+   if(outerNav)outerNav.style.display='none';
+   window.scrollTo({top:0,behavior:'smooth'});
+   return;
  }
  if(!canView(id)){toast('هذا القسم للإدارة فقط');return}
  document.querySelectorAll('.section').forEach(x=>x.classList.remove('show'));
@@ -1644,27 +1644,8 @@ async function login(e){
  const u=(userEl?.value||'').trim();
  const p=passEl?.value||'';
 
- // Local hard-coded administrator login has been disabled in this secure build.
-  
-  // Online/API login for real employee accounts.
- if(window.API){
-   try{
-     const d=await window.API.login(u,p);
-     setCurrentUser(d.user);
-     try{
-       db=await window.API.request('/state');
-       localStorage.setItem(KEY,JSON.stringify(db));
-     }catch(err){}
-     if(loginEl)loginEl.style.display='none';
-     if(dashEl)dashEl.style.display=isManager()?'block':'none';
-     if(isManager())renderAdmin();
-     applyEmployeePermissions();
-     if(!isManager())show('home');
-     toast(isManager()?'تم الدخول للإدارة بشكل آمن ✅':'تم الدخول بحساب الموظف ✅');
-     return;
-   }catch(err){}
- }
-
+ // نفحص الحسابات المحلية أولاً. حساب المدير الأول يُنشأ محلياً،
+ // لذلك وجود API لا يجب أن يمنع دخوله قبل مزامنة الحساب مع الخادم.
  const employees=Array.isArray(db.employees)?db.employees:[];
  const emp=employees.find(x=>x.username===u&&x.password===p&&x.active!==false);
  if(emp){
@@ -1683,6 +1664,35 @@ async function login(e){
    toast(manager?'تم الدخول للإدارة بشكل آمن ✅':'تم الدخول بحساب الموظف ✅');
    refreshFirstManagerButton();
    return;
+ }
+
+ // إذا لم يوجد الحساب محلياً، نجرب تسجيل الدخول من قاعدة البيانات عبر Vercel API.
+ if(window.API){
+   try{
+     const d=await window.API.login(u,p);
+     setCurrentUser(d.user);
+     try{
+       const remote=await window.API.request('/state');
+       if(remote&&typeof remote==='object'){
+         const localEmployees=Array.isArray(db.employees)?db.employees:[];
+         db=Object.assign(db,remote);
+         if(localEmployees.length)db.employees=localEmployees;
+         localStorage.setItem(KEY,JSON.stringify(db));
+       }
+     }catch(err){}
+     if(loginEl)loginEl.style.display='none';
+     if(dashEl)dashEl.style.display=isManager()?'block':'none';
+     applyEmployeePermissions();
+     if(isManager()){
+       show('admin');
+       renderAdmin();
+       window.scrollTo({top:0,behavior:'smooth'});
+     }else{
+       show('home');
+     }
+     toast(isManager()?'تم الدخول للإدارة عبر الخادم ✅':'تم الدخول بحساب الموظف عبر الخادم ✅');
+     return;
+   }catch(err){}
  }
  if(typeof adminAccessAlert==='function' && u){
    try{adminAccessAlert('محاولة دخول فاشلة إلى الإدارة باسم المستخدم: '+u)}catch(_e){}
@@ -2132,7 +2142,7 @@ function applyEmployeePermissions(){
  applySectionEditMode();
 }
 function clearData(){if(!isManager()){toast('هذه العملية للمدير فقط');return}if(confirm('سيتم حذف البيانات المحلية والبدء من جديد.')){localStorage.removeItem(KEY);location.reload()}}
-(async()=>{try{const localSnapshot=JSON.parse(localStorage.getItem(KEY)||'null')||{};const remote=await API.request('/public-state');if(remote&&Array.isArray(remote.products)){const keepHome=localSnapshot.homeMedia??db.homeMedia;const keepCustom=localSnapshot.homeCustomSections??db.homeCustomSections;const keepCategoryMeta=localSnapshot.categoryMeta??db.categoryMeta;const keepProducts=localSnapshot.products??db.products;db=Object.assign(db,remote);if(keepHome!==undefined)db.homeMedia=keepHome;if(keepCustom!==undefined)db.homeCustomSections=keepCustom;if(keepCategoryMeta!==undefined)db.categoryMeta=keepCategoryMeta;if(Array.isArray(keepProducts))db.products=keepProducts;localStorage.setItem(KEY,JSON.stringify(db));}}catch(e){}applyHomeMedia();renderCustomHomeSections();renderProducts();renderSales();renderCustomers();renderRepairs();renderLines();renderLineAccounts();renderInstallments()})();
+(async()=>{try{const localSnapshot=JSON.parse(localStorage.getItem(KEY)||'null')||{};const remote=await API.request('/public-state');if(remote&&Array.isArray(remote.products)){const keepHome=localSnapshot.homeMedia??db.homeMedia;const keepCustom=localSnapshot.homeCustomSections??db.homeCustomSections;const keepCategoryMeta=localSnapshot.categoryMeta??db.categoryMeta;const keepProducts=localSnapshot.products??db.products;const keepEmployees=Array.isArray(localSnapshot.employees)?localSnapshot.employees:db.employees;db=Object.assign(db,remote);if(keepHome!==undefined)db.homeMedia=keepHome;if(keepCustom!==undefined)db.homeCustomSections=keepCustom;if(keepCategoryMeta!==undefined)db.categoryMeta=keepCategoryMeta;if(Array.isArray(keepProducts))db.products=keepProducts;if(Array.isArray(keepEmployees)&&keepEmployees.length)db.employees=keepEmployees;localStorage.setItem(KEY,JSON.stringify(db));}}catch(e){}applyHomeMedia();renderCustomHomeSections();renderProducts();renderSales();renderCustomers();renderRepairs();renderLines();renderLineAccounts();renderInstallments()})();
 
 try{if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{try{runSystemQA()}catch(e){}})}else{runSystemQA()}}catch(e){}
 </script>
@@ -2331,80 +2341,6 @@ body.home-view #home.refHome{width:100%!important;max-width:1536px!important;min
     const html=rows.map(r=>`<div class="row"><b>${esc2(r[0])}</b><span>${esc2(r[1]??'-')}</span></div>`).join('');
     w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>${esc2(title)}</title><style>body{font-family:Arial,sans-serif;padding:22px;max-width:390px;margin:auto;color:#111}.head{text-align:center;border-bottom:2px solid #111;padding-bottom:12px}.row{display:flex;justify-content:space-between;gap:16px;border-bottom:1px dashed #aaa;padding:9px 0}.foot{text-align:center;margin-top:22px;font-size:13px}</style></head><body><div class="head"><h2>مكتب مروان الخزعلي للموبايلات</h2><div>${esc2(title)}</div></div>${html}<div class="foot">شكراً لتعاملكم معنا ❤️</div><div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-
-<script id="marwan-v46-final-hardening">
-(function(){
-  'use strict';
-  function arr(name){ if(!Array.isArray(db[name])) db[name]=[]; return db[name]; }
-  function normalizeFinalData(){
-    ['products','reservations','sales','customers','installments','repairs','lines','messages','employees','stockMoves','returns','lineAccounts','securityAlerts'].forEach(arr);
-    db.homeContent=db.homeContent&&typeof db.homeContent==='object'?db.homeContent:{};
-    db.homeCustomSections=Array.isArray(db.homeCustomSections)?db.homeCustomSections:[];
-    db.products.forEach(p=>{
-      p.stock=Math.max(0,Number(p.stock)||0);
-      p.condition=p.condition||'جديد';
-      p.availability=p.availability==='غير متوفر'||p.stock<=0?'غير متوفر':'متوفر';
-      if(p.availability==='متوفر'&&p.stock<1)p.stock=1;
-      if(typeof normalizeProductDiscount==='function')normalizeProductDiscount(p);
-    });
-    db.sales.forEach(x=>{
-      x.amount=Math.max(0,Number(x.amount)||0);x.paid=Math.max(0,Math.min(x.amount,Number(x.paid)||0));
-      x.remaining=Math.max(0,x.amount-x.paid);
-      x.condition=x.condition||'جديد';
-    });
-    db.installments.forEach(x=>{
-      x.total=Math.max(0,Number(x.total)||0);x.paid=Math.max(0,Math.min(x.total,Number(x.paid)||0));
-      x.monthly=Math.max(0,Number(x.monthly)||0);x.months=Math.max(0,Number(x.months)||1);
-      x.payments=Array.isArray(x.payments)?x.payments:[];x.account=x.account&&typeof x.account==='object'?x.account:{username:x.username||'',password:x.password||''};
-      x.status=x.paid>=x.total&&x.total>0?'مكتمل':(x.status||'منتظم');x.nextDue=x.paid>=x.total?'مكتمل':(x.nextDue||x.firstDue||'-');
-    });
-    db.employees.forEach(x=>{x.permissions=Array.isArray(x.permissions)?x.permissions:[];x.active=x.active!==false;x.recoveryCode=String(x.recoveryCode||'');});
-    try{localStorage.setItem('marwan_shop_v3',JSON.stringify(db));}catch(e){}
-  }
-  function finalQA(){
-    const checks=[]; const has=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
-    try{
-      normalizeFinalData();
-      const required=['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','addReturnFromSale','addReturnRecord','renderAdmin','renderEmployees','renderInstallments','exportShopData','restoreShopData','printFullReport','printInstallmentPayment','printInstallmentFinanceReport','saveHomeContent'];
-      required.forEach(n=>has('وظيفة '+n,typeof window[n]==='function'));
-      has('حماية المدير',typeof window.isManager==='function'&&typeof window.canAccess==='function');
-      has('تسجيل خروج',typeof window.logoutAccount==='function');
-      has('صلاحيات الموظفين',typeof window.saveEmployeePermissions==='function');
-      has('تحكم الواجهة',typeof window.marwanV45RenderLayoutEditor==='function');
-      has('نسخة احتياطية محلية',typeof window.createAutoBackup==='function'&&typeof window.restoreAutoBackup==='function');
-      const ids=[...document.querySelectorAll('[id]')].map(x=>x.id).filter(Boolean),seen=new Set(),dups=[];ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});has('لا توجد IDs مكررة',dups.length===0,dups.join(', '));
-      has('لا يوجد admin/admin123',!/admin\s*\/\s*admin123/i.test(document.documentElement.innerHTML));
-      has('لا يوجد تنبيه مرئي لمحاولة الإدارة',!/alert\(['\"][^'\"]*تنبيه أمني/i.test(document.documentElement.innerHTML));
-      has('بيانات المنتجات مصفوفة',Array.isArray(db.products));
-      has('بيانات المبيعات مصفوفة',Array.isArray(db.sales));
-      has('بيانات التقسيط مصفوفة',Array.isArray(db.installments));
-      has('بيانات الموظفين مصفوفة',Array.isArray(db.employees));
-      has('بيانات النسخ والمرتجعات موجودة',Array.isArray(db.returns)&&Array.isArray(db.stockMoves));
-      window.marwanV46QA={passed:checks.filter(x=>x.ok).length,total:checks.length,checks,duplicateIds:dups};
-    }catch(e){window.marwanV46QA={passed:0,total:0,error:String(e)}}
-  }
-  function patchTouchLayout(){
-    if(window.__v46TouchPatched)return;
-    const old=window.marwanV45RenderLayoutEditor;
-    if(typeof old!=='function')return;
-    window.__v46TouchPatched=true;
-    window.marwanV46RenderLayoutEditor=old;
-  }
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){normalizeFinalData();patchTouchLayout();finalQA();},350);});
-  window.marwanV46FinalQA=finalQA;
-})();
-</script>
-
-<script id="marwan-v50-admin-home-guard">
-(function(){
- function guard(){try{
-  const admin=document.getElementById('admin'),card=document.getElementById('homeManagerCard');
-  if(card&&admin)card.style.display=admin.classList.contains('show')?'block':'none';
- }catch(e){}}
- document.addEventListener('DOMContentLoaded',guard);
- setInterval(guard,700);
-})();
-</script>
 </body></html>`);
     w.document.close(); w.onload=()=>{try{w.print();}catch(e){}};
   }
@@ -2469,70 +2405,6 @@ body::after{content:"";position:fixed;inset:0;z-index:-4;background:linear-gradi
 .employee-readonly form{display:none!important}.employee-readonly .viewOnlyDisabled{opacity:.55!important;cursor:not-allowed!important}.employee-readonly input,.employee-readonly select,.employee-readonly textarea{pointer-events:none!important}
 </style>
 </head><body><div class="head"><h2>مكتب مروان الخزعلي للموبايلات</h2><div>وصل مبيعات</div></div><div class="row"><b>الزبون</b><span>${esc2(x.customer)}</span></div><div class="row"><b>الهاتف</b><span>${esc2(x.phone||'-')}</span></div><div class="row"><b>الجهاز</b><span>${esc2(x.product)}</span></div><div class="row"><b>النوع</b><span>${esc2(x.condition||'جديد')}</span></div><div class="row"><b>التاريخ</b><span>${esc2(x.date||'-')}</span></div><div class="row total"><b>الإجمالي</b><span>${money(x.amount)}</span></div><div class="row"><b>المدفوع</b><span>${money(x.paid)}</span></div><div class="row"><b>المتبقي</b><span>${money(x.remaining)}</span></div><div class="foot">شكراً لتعاملكم معنا ❤️</div><div class="foot">اضغط طباعة إذا لم تبدأ الطباعة تلقائياً</div>
-
-<script id="marwan-v46-final-hardening">
-(function(){
-  'use strict';
-  function arr(name){ if(!Array.isArray(db[name])) db[name]=[]; return db[name]; }
-  function normalizeFinalData(){
-    ['products','reservations','sales','customers','installments','repairs','lines','messages','employees','stockMoves','returns','lineAccounts','securityAlerts'].forEach(arr);
-    db.homeContent=db.homeContent&&typeof db.homeContent==='object'?db.homeContent:{};
-    db.homeCustomSections=Array.isArray(db.homeCustomSections)?db.homeCustomSections:[];
-    db.products.forEach(p=>{
-      p.stock=Math.max(0,Number(p.stock)||0);
-      p.condition=p.condition||'جديد';
-      p.availability=p.availability==='غير متوفر'||p.stock<=0?'غير متوفر':'متوفر';
-      if(p.availability==='متوفر'&&p.stock<1)p.stock=1;
-      if(typeof normalizeProductDiscount==='function')normalizeProductDiscount(p);
-    });
-    db.sales.forEach(x=>{
-      x.amount=Math.max(0,Number(x.amount)||0);x.paid=Math.max(0,Math.min(x.amount,Number(x.paid)||0));
-      x.remaining=Math.max(0,x.amount-x.paid);
-      x.condition=x.condition||'جديد';
-    });
-    db.installments.forEach(x=>{
-      x.total=Math.max(0,Number(x.total)||0);x.paid=Math.max(0,Math.min(x.total,Number(x.paid)||0));
-      x.monthly=Math.max(0,Number(x.monthly)||0);x.months=Math.max(0,Number(x.months)||1);
-      x.payments=Array.isArray(x.payments)?x.payments:[];x.account=x.account&&typeof x.account==='object'?x.account:{username:x.username||'',password:x.password||''};
-      x.status=x.paid>=x.total&&x.total>0?'مكتمل':(x.status||'منتظم');x.nextDue=x.paid>=x.total?'مكتمل':(x.nextDue||x.firstDue||'-');
-    });
-    db.employees.forEach(x=>{x.permissions=Array.isArray(x.permissions)?x.permissions:[];x.active=x.active!==false;x.recoveryCode=String(x.recoveryCode||'');});
-    try{localStorage.setItem('marwan_shop_v3',JSON.stringify(db));}catch(e){}
-  }
-  function finalQA(){
-    const checks=[]; const has=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
-    try{
-      normalizeFinalData();
-      const required=['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','addReturnFromSale','addReturnRecord','renderAdmin','renderEmployees','renderInstallments','exportShopData','restoreShopData','printFullReport','printInstallmentPayment','printInstallmentFinanceReport','saveHomeContent'];
-      required.forEach(n=>has('وظيفة '+n,typeof window[n]==='function'));
-      has('حماية المدير',typeof window.isManager==='function'&&typeof window.canAccess==='function');
-      has('تسجيل خروج',typeof window.logoutAccount==='function');
-      has('صلاحيات الموظفين',typeof window.saveEmployeePermissions==='function');
-      has('تحكم الواجهة',typeof window.marwanV45RenderLayoutEditor==='function');
-      has('نسخة احتياطية محلية',typeof window.createAutoBackup==='function'&&typeof window.restoreAutoBackup==='function');
-      const ids=[...document.querySelectorAll('[id]')].map(x=>x.id).filter(Boolean),seen=new Set(),dups=[];ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});has('لا توجد IDs مكررة',dups.length===0,dups.join(', '));
-      has('لا يوجد admin/admin123',!/admin\s*\/\s*admin123/i.test(document.documentElement.innerHTML));
-      has('لا يوجد تنبيه مرئي لمحاولة الإدارة',!/alert\(['\"][^'\"]*تنبيه أمني/i.test(document.documentElement.innerHTML));
-      has('بيانات المنتجات مصفوفة',Array.isArray(db.products));
-      has('بيانات المبيعات مصفوفة',Array.isArray(db.sales));
-      has('بيانات التقسيط مصفوفة',Array.isArray(db.installments));
-      has('بيانات الموظفين مصفوفة',Array.isArray(db.employees));
-      has('بيانات النسخ والمرتجعات موجودة',Array.isArray(db.returns)&&Array.isArray(db.stockMoves));
-      window.marwanV46QA={passed:checks.filter(x=>x.ok).length,total:checks.length,checks,duplicateIds:dups};
-    }catch(e){window.marwanV46QA={passed:0,total:0,error:String(e)}}
-  }
-  function patchTouchLayout(){
-    if(window.__v46TouchPatched)return;
-    const old=window.marwanV45RenderLayoutEditor;
-    if(typeof old!=='function')return;
-    window.__v46TouchPatched=true;
-    window.marwanV46RenderLayoutEditor=old;
-  }
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){normalizeFinalData();patchTouchLayout();finalQA();},350);});
-  window.marwanV46FinalQA=finalQA;
-})();
-</script>
-
 </body></html>`);
     w.document.close();
     w.onload=()=>{try{w.print();}catch(e){}};
@@ -2651,71 +2523,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-4;background:linear-gradi
     if(!w){alert('اسمح بفتح نافذة الطباعة من المتصفح أولاً');return;}
     w.document.write('<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>طباعة المنتجات</title>'+
       '<style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;direction:rtl;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:8px;text-align:right}.print-discount-info{line-height:1.7}.print-discount-info div:first-child{text-decoration:line-through}.print-price{font-weight:bold}</style>'+
-      '</head><body><h1>قائمة المنتجات</h1><table><thead><tr><th>#</th><th>المنتج</th><th>الأسعار والخصم</th></tr></thead><tbody>'+rows+'</tbody></table></tbody></table>
-<script id="marwan-v46-final-hardening">
-(function(){
-  'use strict';
-  function arr(name){ if(!Array.isArray(db[name])) db[name]=[]; return db[name]; }
-  function normalizeFinalData(){
-    ['products','reservations','sales','customers','installments','repairs','lines','messages','employees','stockMoves','returns','lineAccounts','securityAlerts'].forEach(arr);
-    db.homeContent=db.homeContent&&typeof db.homeContent==='object'?db.homeContent:{};
-    db.homeCustomSections=Array.isArray(db.homeCustomSections)?db.homeCustomSections:[];
-    db.products.forEach(p=>{
-      p.stock=Math.max(0,Number(p.stock)||0);
-      p.condition=p.condition||'جديد';
-      p.availability=p.availability==='غير متوفر'||p.stock<=0?'غير متوفر':'متوفر';
-      if(p.availability==='متوفر'&&p.stock<1)p.stock=1;
-      if(typeof normalizeProductDiscount==='function')normalizeProductDiscount(p);
-    });
-    db.sales.forEach(x=>{
-      x.amount=Math.max(0,Number(x.amount)||0);x.paid=Math.max(0,Math.min(x.amount,Number(x.paid)||0));
-      x.remaining=Math.max(0,x.amount-x.paid);
-      x.condition=x.condition||'جديد';
-    });
-    db.installments.forEach(x=>{
-      x.total=Math.max(0,Number(x.total)||0);x.paid=Math.max(0,Math.min(x.total,Number(x.paid)||0));
-      x.monthly=Math.max(0,Number(x.monthly)||0);x.months=Math.max(0,Number(x.months)||1);
-      x.payments=Array.isArray(x.payments)?x.payments:[];x.account=x.account&&typeof x.account==='object'?x.account:{username:x.username||'',password:x.password||''};
-      x.status=x.paid>=x.total&&x.total>0?'مكتمل':(x.status||'منتظم');x.nextDue=x.paid>=x.total?'مكتمل':(x.nextDue||x.firstDue||'-');
-    });
-    db.employees.forEach(x=>{x.permissions=Array.isArray(x.permissions)?x.permissions:[];x.active=x.active!==false;x.recoveryCode=String(x.recoveryCode||'');});
-    try{localStorage.setItem('marwan_shop_v3',JSON.stringify(db));}catch(e){}
-  }
-  function finalQA(){
-    const checks=[]; const has=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
-    try{
-      normalizeFinalData();
-      const required=['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','addReturnFromSale','addReturnRecord','renderAdmin','renderEmployees','renderInstallments','exportShopData','restoreShopData','printFullReport','printInstallmentPayment','printInstallmentFinanceReport','saveHomeContent'];
-      required.forEach(n=>has('وظيفة '+n,typeof window[n]==='function'));
-      has('حماية المدير',typeof window.isManager==='function'&&typeof window.canAccess==='function');
-      has('تسجيل خروج',typeof window.logoutAccount==='function');
-      has('صلاحيات الموظفين',typeof window.saveEmployeePermissions==='function');
-      has('تحكم الواجهة',typeof window.marwanV45RenderLayoutEditor==='function');
-      has('نسخة احتياطية محلية',typeof window.createAutoBackup==='function'&&typeof window.restoreAutoBackup==='function');
-      const ids=[...document.querySelectorAll('[id]')].map(x=>x.id).filter(Boolean),seen=new Set(),dups=[];ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});has('لا توجد IDs مكررة',dups.length===0,dups.join(', '));
-      has('لا يوجد admin/admin123',!/admin\s*\/\s*admin123/i.test(document.documentElement.innerHTML));
-      has('لا يوجد تنبيه مرئي لمحاولة الإدارة',!/alert\(['\"][^'\"]*تنبيه أمني/i.test(document.documentElement.innerHTML));
-      has('بيانات المنتجات مصفوفة',Array.isArray(db.products));
-      has('بيانات المبيعات مصفوفة',Array.isArray(db.sales));
-      has('بيانات التقسيط مصفوفة',Array.isArray(db.installments));
-      has('بيانات الموظفين مصفوفة',Array.isArray(db.employees));
-      has('بيانات النسخ والمرتجعات موجودة',Array.isArray(db.returns)&&Array.isArray(db.stockMoves));
-      window.marwanV46QA={passed:checks.filter(x=>x.ok).length,total:checks.length,checks,duplicateIds:dups};
-    }catch(e){window.marwanV46QA={passed:0,total:0,error:String(e)}}
-  }
-  function patchTouchLayout(){
-    if(window.__v46TouchPatched)return;
-    const old=window.marwanV45RenderLayoutEditor;
-    if(typeof old!=='function')return;
-    window.__v46TouchPatched=true;
-    window.marwanV46RenderLayoutEditor=old;
-  }
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){normalizeFinalData();patchTouchLayout();finalQA();},350);});
-  window.marwanV46FinalQA=finalQA;
-})();
-</script>
-
-</body></html>');
+      '</head><body><h1>قائمة المنتجات</h1><table><thead><tr><th>#</th><th>المنتج</th><th>الأسعار والخصم</th></tr></thead><tbody>'+rows+'</tbody></table></tbody></table></body></html>');
     w.document.close(); w.focus(); setTimeout(function(){w.print();},250);
   };
 
@@ -2785,71 +2593,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-4;background:linear-gradi
     if(!w){toast('اسمح بالنوافذ المنبثقة حتى تعمل الطباعة');return;}
     w.document.write('<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
       '<style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;padding:18px;color:#111}h2{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:7px;text-align:right}th{font-weight:bold}</style>'+
-      '</head><body><h2>مكتب مروان الخزعلي للموبايلات</h2><h3>'+esc(title)+'</h3>'+tableHtml+'
-<script id="marwan-v46-final-hardening">
-(function(){
-  'use strict';
-  function arr(name){ if(!Array.isArray(db[name])) db[name]=[]; return db[name]; }
-  function normalizeFinalData(){
-    ['products','reservations','sales','customers','installments','repairs','lines','messages','employees','stockMoves','returns','lineAccounts','securityAlerts'].forEach(arr);
-    db.homeContent=db.homeContent&&typeof db.homeContent==='object'?db.homeContent:{};
-    db.homeCustomSections=Array.isArray(db.homeCustomSections)?db.homeCustomSections:[];
-    db.products.forEach(p=>{
-      p.stock=Math.max(0,Number(p.stock)||0);
-      p.condition=p.condition||'جديد';
-      p.availability=p.availability==='غير متوفر'||p.stock<=0?'غير متوفر':'متوفر';
-      if(p.availability==='متوفر'&&p.stock<1)p.stock=1;
-      if(typeof normalizeProductDiscount==='function')normalizeProductDiscount(p);
-    });
-    db.sales.forEach(x=>{
-      x.amount=Math.max(0,Number(x.amount)||0);x.paid=Math.max(0,Math.min(x.amount,Number(x.paid)||0));
-      x.remaining=Math.max(0,x.amount-x.paid);
-      x.condition=x.condition||'جديد';
-    });
-    db.installments.forEach(x=>{
-      x.total=Math.max(0,Number(x.total)||0);x.paid=Math.max(0,Math.min(x.total,Number(x.paid)||0));
-      x.monthly=Math.max(0,Number(x.monthly)||0);x.months=Math.max(0,Number(x.months)||1);
-      x.payments=Array.isArray(x.payments)?x.payments:[];x.account=x.account&&typeof x.account==='object'?x.account:{username:x.username||'',password:x.password||''};
-      x.status=x.paid>=x.total&&x.total>0?'مكتمل':(x.status||'منتظم');x.nextDue=x.paid>=x.total?'مكتمل':(x.nextDue||x.firstDue||'-');
-    });
-    db.employees.forEach(x=>{x.permissions=Array.isArray(x.permissions)?x.permissions:[];x.active=x.active!==false;x.recoveryCode=String(x.recoveryCode||'');});
-    try{localStorage.setItem('marwan_shop_v3',JSON.stringify(db));}catch(e){}
-  }
-  function finalQA(){
-    const checks=[]; const has=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
-    try{
-      normalizeFinalData();
-      const required=['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','addReturnFromSale','addReturnRecord','renderAdmin','renderEmployees','renderInstallments','exportShopData','restoreShopData','printFullReport','printInstallmentPayment','printInstallmentFinanceReport','saveHomeContent'];
-      required.forEach(n=>has('وظيفة '+n,typeof window[n]==='function'));
-      has('حماية المدير',typeof window.isManager==='function'&&typeof window.canAccess==='function');
-      has('تسجيل خروج',typeof window.logoutAccount==='function');
-      has('صلاحيات الموظفين',typeof window.saveEmployeePermissions==='function');
-      has('تحكم الواجهة',typeof window.marwanV45RenderLayoutEditor==='function');
-      has('نسخة احتياطية محلية',typeof window.createAutoBackup==='function'&&typeof window.restoreAutoBackup==='function');
-      const ids=[...document.querySelectorAll('[id]')].map(x=>x.id).filter(Boolean),seen=new Set(),dups=[];ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});has('لا توجد IDs مكررة',dups.length===0,dups.join(', '));
-      has('لا يوجد admin/admin123',!/admin\s*\/\s*admin123/i.test(document.documentElement.innerHTML));
-      has('لا يوجد تنبيه مرئي لمحاولة الإدارة',!/alert\(['\"][^'\"]*تنبيه أمني/i.test(document.documentElement.innerHTML));
-      has('بيانات المنتجات مصفوفة',Array.isArray(db.products));
-      has('بيانات المبيعات مصفوفة',Array.isArray(db.sales));
-      has('بيانات التقسيط مصفوفة',Array.isArray(db.installments));
-      has('بيانات الموظفين مصفوفة',Array.isArray(db.employees));
-      has('بيانات النسخ والمرتجعات موجودة',Array.isArray(db.returns)&&Array.isArray(db.stockMoves));
-      window.marwanV46QA={passed:checks.filter(x=>x.ok).length,total:checks.length,checks,duplicateIds:dups};
-    }catch(e){window.marwanV46QA={passed:0,total:0,error:String(e)}}
-  }
-  function patchTouchLayout(){
-    if(window.__v46TouchPatched)return;
-    const old=window.marwanV45RenderLayoutEditor;
-    if(typeof old!=='function')return;
-    window.__v46TouchPatched=true;
-    window.marwanV46RenderLayoutEditor=old;
-  }
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){normalizeFinalData();patchTouchLayout();finalQA();},350);});
-  window.marwanV46FinalQA=finalQA;
-})();
-</script>
-
-</body></html>');
+      '</head><body><h2>مكتب مروان الخزعلي للموبايلات</h2><h3>'+esc(title)+'</h3>'+tableHtml+'</body></html>');
     w.document.close();
     setTimeout(function(){try{w.focus();w.print();}catch(e){}},300);
   }
@@ -3661,70 +3405,149 @@ const timer=setInterval(()=>{if(typeof window.renderHomeManager==='function'){pa
 })();
 </script>
 
-
-<script id="marwan-v46-final-hardening">
+<style id="marwan-v47-safe-layout-editor-css">
+/* V47: editor UI only; mobile drag fixed. The storefront is NOT rearranged until the manager explicitly applies changes. */
+.mrV45EditorList{display:grid;gap:8px}
+.mrV45EditorRow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:10px;border:1px solid rgba(31,168,255,.28);border-radius:12px;background:rgba(4,22,55,.55)}
+.mrV45Grip{font-size:22px;cursor:grab;user-select:none;padding:4px 7px;border-radius:8px;background:rgba(31,168,255,.12);touch-action:none}
+.mrV45Controls{display:flex;gap:6px;flex-wrap:wrap}
+.mrV45Controls button{white-space:nowrap}
+.mrV45Drop{outline:2px dashed rgba(31,168,255,.9)}
+.mrV45LayoutCanvas>.mrV45Tall{min-height:420px}
+.mrV45LayoutCanvas>.mrV45Compact{max-height:260px;overflow:auto}
+@media(max-width:600px){.mrV45EditorRow{grid-template-columns:auto 1fr}.mrV45Controls{grid-column:1/-1}.mrV45LayoutCanvas{gap:7px!important}.mrV45LayoutCanvas>.mrV45Tall{min-height:300px}}
+</style>
+<script id="marwan-v47-safe-layout-editor">
 (function(){
   'use strict';
-  function arr(name){ if(!Array.isArray(db[name])) db[name]=[]; return db[name]; }
-  function normalizeFinalData(){
-    ['products','reservations','sales','customers','installments','repairs','lines','messages','employees','stockMoves','returns','lineAccounts','securityAlerts'].forEach(arr);
+  const defs=[
+    {key:'hero',selector:'.refHero',title:'البانر الرئيسي',defaultSpan:12},
+    {key:'categories',selector:'.refCategories',title:'أقسام المنتجات',defaultSpan:12},
+    {key:'services',selector:'.refServices',title:'الخدمات',defaultSpan:12},
+    {key:'promo',selector:'.refBest',title:'الخطوط والعروض',defaultSpan:12},
+    {key:'mostSold',selector:'.refProductsWrap',title:'الأكثر مبيعاً',defaultSpan:12},
+    {key:'bottom',selector:'.refBottomBanners',title:'البنرات السفلية',defaultSpan:12},
+    {key:'custom',selector:'#homeCustomSections',title:'الأقسام المضافة',defaultSpan:12}
+  ];
+  const spans=[12,9,8,6,4,3], spanLabel={12:'كامل',9:'¾',8:'⅔',6:'نصف',4:'⅓',3:'¼'};
+  const heights=['normal','compact','tall'], heightLabel={normal:'طبيعي',compact:'صغير',tall:'كبير'};
+  const manager=()=>{try{return typeof isManager==='function'&&isManager()}catch(e){return false}};
+  const toast2=m=>{try{if(typeof toast==='function')toast(m)}catch(e){}};
+  function defaults(){return {order:defs.map(x=>x.key),items:Object.fromEntries(defs.map(x=>[x.key,{span:x.defaultSpan,height:'normal'}]))}};
+  function getLayout(){
     db.homeContent=db.homeContent&&typeof db.homeContent==='object'?db.homeContent:{};
-    db.homeCustomSections=Array.isArray(db.homeCustomSections)?db.homeCustomSections:[];
-    db.products.forEach(p=>{
-      p.stock=Math.max(0,Number(p.stock)||0);
-      p.condition=p.condition||'جديد';
-      p.availability=p.availability==='غير متوفر'||p.stock<=0?'غير متوفر':'متوفر';
-      if(p.availability==='متوفر'&&p.stock<1)p.stock=1;
-      if(typeof normalizeProductDiscount==='function')normalizeProductDiscount(p);
-    });
-    db.sales.forEach(x=>{
-      x.amount=Math.max(0,Number(x.amount)||0);x.paid=Math.max(0,Math.min(x.amount,Number(x.paid)||0));
-      x.remaining=Math.max(0,x.amount-x.paid);
-      x.condition=x.condition||'جديد';
-    });
-    db.installments.forEach(x=>{
-      x.total=Math.max(0,Number(x.total)||0);x.paid=Math.max(0,Math.min(x.total,Number(x.paid)||0));
-      x.monthly=Math.max(0,Number(x.monthly)||0);x.months=Math.max(0,Number(x.months)||1);
-      x.payments=Array.isArray(x.payments)?x.payments:[];x.account=x.account&&typeof x.account==='object'?x.account:{username:x.username||'',password:x.password||''};
-      x.status=x.paid>=x.total&&x.total>0?'مكتمل':(x.status||'منتظم');x.nextDue=x.paid>=x.total?'مكتمل':(x.nextDue||x.firstDue||'-');
-    });
-    db.employees.forEach(x=>{x.permissions=Array.isArray(x.permissions)?x.permissions:[];x.active=x.active!==false;x.recoveryCode=String(x.recoveryCode||'');});
-    try{localStorage.setItem('marwan_shop_v3',JSON.stringify(db));}catch(e){}
+    const old=db.homeContent.layout&&typeof db.homeContent.layout==='object'?db.homeContent.layout:null;
+    const base=defaults(); if(!old)return base;
+    const valid=new Set(defs.map(x=>x.key));
+    const order=(Array.isArray(old.order)?old.order:base.order).filter(x=>valid.has(x));
+    defs.forEach(x=>{if(!order.includes(x.key))order.push(x.key)});
+    const items={}; defs.forEach(x=>{const o=old.items&&old.items[x.key]||{};items[x.key]={span:spans.includes(+o.span)?+o.span:x.defaultSpan,height:heights.includes(o.height)?o.height:'normal'}});
+    return {order,items};
   }
-  function finalQA(){
-    const checks=[]; const has=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
-    try{
-      normalizeFinalData();
-      const required=['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','addReturnFromSale','addReturnRecord','renderAdmin','renderEmployees','renderInstallments','exportShopData','restoreShopData','printFullReport','printInstallmentPayment','printInstallmentFinanceReport','saveHomeContent'];
-      required.forEach(n=>has('وظيفة '+n,typeof window[n]==='function'));
-      has('حماية المدير',typeof window.isManager==='function'&&typeof window.canAccess==='function');
-      has('تسجيل خروج',typeof window.logoutAccount==='function');
-      has('صلاحيات الموظفين',typeof window.saveEmployeePermissions==='function');
-      has('تحكم الواجهة',typeof window.marwanV45RenderLayoutEditor==='function');
-      has('نسخة احتياطية محلية',typeof window.createAutoBackup==='function'&&typeof window.restoreAutoBackup==='function');
-      const ids=[...document.querySelectorAll('[id]')].map(x=>x.id).filter(Boolean),seen=new Set(),dups=[];ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});has('لا توجد IDs مكررة',dups.length===0,dups.join(', '));
-      has('لا يوجد admin/admin123',!/admin\s*\/\s*admin123/i.test(document.documentElement.innerHTML));
-      has('لا يوجد تنبيه مرئي لمحاولة الإدارة',!/alert\(['\"][^'\"]*تنبيه أمني/i.test(document.documentElement.innerHTML));
-      has('بيانات المنتجات مصفوفة',Array.isArray(db.products));
-      has('بيانات المبيعات مصفوفة',Array.isArray(db.sales));
-      has('بيانات التقسيط مصفوفة',Array.isArray(db.installments));
-      has('بيانات الموظفين مصفوفة',Array.isArray(db.employees));
-      has('بيانات النسخ والمرتجعات موجودة',Array.isArray(db.returns)&&Array.isArray(db.stockMoves));
-      window.marwanV46QA={passed:checks.filter(x=>x.ok).length,total:checks.length,checks,duplicateIds:dups};
-    }catch(e){window.marwanV46QA={passed:0,total:0,error:String(e)}}
+  function saveOnly(layout){db.homeContent=db.homeContent||{};db.homeContent.layout=layout;try{save()}catch(e){}}
+  function applyLayout(layout){
+    const root=document.querySelector('#home'); if(!root)return;
+    const nav=root.querySelector('.refNav'); if(!nav)return;
+    let canvas=root.querySelector('#mrV45LayoutCanvas');
+    if(!canvas){canvas=document.createElement('div');canvas.id='mrV45LayoutCanvas';canvas.className='mrV45LayoutCanvas';canvas.style.cssText='display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;width:100%;align-items:start';nav.insertAdjacentElement('afterend',canvas)}
+    defs.forEach(d=>{const el=root.querySelector(d.selector);if(el&&!canvas.contains(el))canvas.appendChild(el)});
+    layout.order.forEach(key=>{const d=defs.find(x=>x.key===key),el=d&&root.querySelector(d.selector);if(el)canvas.appendChild(el)});
+    defs.forEach(d=>{const el=root.querySelector(d.selector);if(!el||!canvas.contains(el))return;const cfg=layout.items[d.key]||{span:12,height:'normal'};el.style.gridColumn='span '+cfg.span;el.style.minWidth='0';el.classList.toggle('mrV45Tall',cfg.height==='tall');el.classList.toggle('mrV45Compact',cfg.height==='compact')});
   }
-  function patchTouchLayout(){
-    if(window.__v46TouchPatched)return;
-    const old=window.marwanV45RenderLayoutEditor;
-    if(typeof old!=='function')return;
-    window.__v46TouchPatched=true;
-    window.marwanV46RenderLayoutEditor=old;
+  function render(){
+    const host=document.getElementById('homeManager');if(!host||!manager())return;
+    let card=document.getElementById('homeV45LayoutCard');
+    if(!card){card=document.createElement('div');card.id='homeV45LayoutCard';card.className='card';card.style='padding:14px;border:2px solid rgba(31,168,255,.55);margin-bottom:14px';host.prepend(card)}
+    const l=getLayout();
+    card.innerHTML='<h3 style="margin-top:0">↕️ تحكم بمكان وحجم الأقسام</h3><p class="muted">هنا فقط تتحكم بالواجهة. <b>الموقع نفسه لا يتغير</b> إلا بعد ضغط «تطبيق التغييرات».</p><div class="actions" style="margin-bottom:10px"><button class="btn" type="button" id="v45Apply">💾 تطبيق التغييرات</button><button class="btn secondary" type="button" id="v45Reset">↩️ إرجاع التصميم الأصلي</button></div><div id="v45List" class="mrV45EditorList"></div>';
+    const list=card.querySelector('#v45List');
+    l.order.forEach(key=>{
+      const d=defs.find(x=>x.key===key);if(!d)return;const cfg=l.items[key];
+      const row=document.createElement('div');row.className='mrV45EditorRow';row.dataset.key=key;row.innerHTML='<div class="mrV45Grip" title="اسحب القسم">☷</div><div><b>'+d.title+'</b><div class="muted" style="font-size:12px">العرض: '+spanLabel[cfg.span]+' — الارتفاع: '+heightLabel[cfg.height]+'</div></div><div class="mrV45Controls"><button class="btn secondary" type="button" data-a="up">⬆️</button><button class="btn secondary" type="button" data-a="down">⬇️</button><button class="btn secondary" type="button" data-a="wm">↔️−</button><button class="btn secondary" type="button" data-a="wp">↔️+</button><button class="btn secondary" type="button" data-a="hm">↕️−</button><button class="btn secondary" type="button" data-a="hp">↕️+</button></div>';
+      const move=(delta)=>{const i=l.order.indexOf(key),j=i+delta;if(j<0||j>=l.order.length)return;[l.order[i],l.order[j]]=[l.order[j],l.order[i]];render()};
+      const width=(delta)=>{let i=spans.indexOf(cfg.span);i=Math.max(0,Math.min(spans.length-1,i+delta));cfg.span=spans[i];render()};
+      const height=(delta)=>{let i=heights.indexOf(cfg.height);i=Math.max(0,Math.min(heights.length-1,i+delta));cfg.height=heights[i];render()};
+      row.querySelector('[data-a=up]').onclick=()=>move(-1);row.querySelector('[data-a=down]').onclick=()=>move(1);row.querySelector('[data-a=wm]').onclick=()=>width(-1);row.querySelector('[data-a=wp]').onclick=()=>width(1);row.querySelector('[data-a=hm]').onclick=()=>height(-1);row.querySelector('[data-a=hp]').onclick=()=>height(1);
+      row.draggable=true;row.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',key));row.addEventListener('dragover',e=>{e.preventDefault();row.classList.add('mrV45Drop')});row.addEventListener('dragleave',()=>row.classList.remove('mrV45Drop'));row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('mrV45Drop');const from=e.dataTransfer.getData('text/plain');const a=l.order.indexOf(from),b=l.order.indexOf(key);if(a>=0&&b>=0&&a!==b){l.order.splice(a,1);l.order.splice(b,0,from);render()}});
+      list.appendChild(row);
+    });
+    /* V47: reliable touch drag for Android/iPhone. Drag starts only from ☷. */
+    let touchDrag=null;
+    list.querySelectorAll('.mrV45Grip').forEach(grip=>{
+      grip.addEventListener('pointerdown',e=>{
+        const row=e.currentTarget.closest('.mrV45EditorRow');
+        if(!row)return;
+        e.preventDefault();
+        touchDrag={from:row.dataset.key,pointerId:e.pointerId};
+        row.classList.add('mrV45Drop');
+      },{passive:false});
+    });
+    const finishTouchDrag=e=>{
+      if(!touchDrag)return;
+      const from=touchDrag.from;
+      const active=list.querySelector('[data-key="'+CSS.escape(from)+'"]');
+      active?.classList.remove('mrV45Drop');
+      const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.mrV45EditorRow');
+      const to=target?.dataset?.key;
+      touchDrag=null;
+      if(!to||to===from)return;
+      const a=l.order.indexOf(from),b=l.order.indexOf(to);
+      if(a>=0&&b>=0&&a!==b){l.order.splice(a,1);l.order.splice(b,0,from);render();}
+    };
+    document.addEventListener('pointerup',finishTouchDrag,{passive:true});
+    document.addEventListener('pointercancel',()=>{if(touchDrag){const active=list.querySelector('[data-key="'+CSS.escape(touchDrag.from)+'"]');active?.classList.remove('mrV45Drop');touchDrag=null;}},{passive:true});
+    card.querySelector('#v45Apply').onclick=()=>{saveOnly(l);applyLayout(l);toast2('تم تطبيق ترتيب وحجم الأقسام ✅')};
+    card.querySelector('#v45Reset').onclick=()=>{if(!confirm('إرجاع الواجهة للتصميم الأصلي؟'))return;const d=defaults();saveOnly(d);location.reload()};
   }
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){normalizeFinalData();patchTouchLayout();finalQA();},350);});
-  window.marwanV46FinalQA=finalQA;
+  function patch(){const old=window.renderHomeManager;if(typeof old!=='function'||old.__v45)return;function wrapped(){old.apply(this,arguments);setTimeout(render,0)}wrapped.__v45=true;window.renderHomeManager=wrapped;}
+  const init=()=>{try{patch()}catch(e){}};document.addEventListener('DOMContentLoaded',init);setTimeout(init,500);
+  const t=setInterval(()=>{if(typeof window.renderHomeManager==='function'){patch();clearInterval(t)}},100);
+  window.marwanV45RenderLayoutEditor=render;
 })();
 </script>
 
+<script id="marwan-v48-system-health">
+(function(){
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function manager(){try{return typeof isManager==='function'&&isManager()}catch(e){return false}}
+  function checks(){
+    const rows=[];
+    const add=(name,ok,detail)=>rows.push({name,ok:!!ok,detail:detail||''});
+    let d=window.db;
+    add('قاعدة البيانات موجودة',!!d, d?'OK':'لم يتم العثور على db');
+    const arrays=['products','customers','sales','installments','returns','repairs','reservations','employees','lines','lineAccounts','stockMoves'];
+    if(d) arrays.forEach(k=>add('db.'+k+' قائمة سليمة',Array.isArray(d[k]),Array.isArray(d[k])?'OK':'سيتم تهيئتها عند الحاجة'));
+    ['addProduct','addSale','addInstallment','recordPayment','addRepair','addReservation','renderAdmin','openHomeManager','saveEmployeePermissions','printInstallmentPayment','printInstallmentFinanceReport'].forEach(fn=>add('الدالة '+fn,typeof window[fn]==='function',''));
+    let ls=true;try{localStorage.setItem('__marwan_v48_test','1');ls=localStorage.getItem('__marwan_v48_test')==='1';localStorage.removeItem('__marwan_v48_test')}catch(e){ls=false}
+    add('التخزين المحلي يعمل',ls,'');
+    let layoutOk=true, layoutDetail='';
+    try{const l=d&&d.homeContent&&d.homeContent.layout;if(l&&Array.isArray(l.order)){const uniq=new Set(l.order);layoutOk=uniq.size===l.order.length;layoutDetail=layoutOk?'الترتيب بدون تكرار':'يوجد تكرار في ترتيب الأقسام'}}catch(e){layoutOk=false;layoutDetail='تعذر فحص التخطيط'}
+    add('تخطيط الواجهة محفوظ بدون تكرار',layoutOk,layoutDetail);
+    return rows;
+  }
+  window.runV48Health=function(){
+    const rows=checks(); const bad=rows.filter(x=>!x.ok).length;
+    let box=document.getElementById('v48HealthBox');
+    if(!box){box=document.createElement('div');box.id='v48HealthBox';box.style.cssText='margin:14px 0;padding:14px;border:1px solid rgba(0,0,0,.12);border-radius:14px;background:var(--card,#fff);';
+      const host=document.querySelector('#admin')||document.querySelector('[id*="admin"]');
+      if(host)host.appendChild(box); else document.body.appendChild(box);
+    }
+    box.innerHTML='<h3 style="margin-top:0">🧪 فحص صحة النظام V48</h3><p><b>'+ (bad?'⚠️ يحتاج مراجعة: '+bad:'✅ كل الفحوصات الأساسية ناجحة') +'</b></p>'+rows.map(x=>'<div style="padding:5px 0">'+(x.ok?'✅':'❌')+' '+esc(x.name)+(x.detail?' <small class="muted">— '+esc(x.detail)+'</small>':'')+'</div>').join('')+'<button type="button" class="btn" id="v48HealthRun">🔄 إعادة الفحص</button>';
+    const b=document.getElementById('v48HealthRun'); if(b)b.onclick=window.runV48Health;
+  };
+  function mount(){
+    if(!manager())return;
+    if(document.getElementById('v48HealthEntry'))return;
+    const host=document.querySelector('#admin')||document.querySelector('[id*="admin"]');
+    if(!host)return;
+    const wrap=document.createElement('div');wrap.id='v48HealthEntry';wrap.style.margin='12px 0';
+    wrap.innerHTML='<button type="button" class="btn secondary" id="v48HealthOpen">🧪 فحص صحة النظام</button>';
+    host.prepend(wrap);
+    document.getElementById('v48HealthOpen').onclick=window.runV48Health;
+  }
+  setInterval(mount,700);setTimeout(mount,300);
+})();
+</script>
 </body>
 <script>document.addEventListener("DOMContentLoaded",()=>{try{initRepairProfitBox();renderRepairs();}catch(e){}});</script>
 <script id="marwan-v39-security-integrity-qa">
