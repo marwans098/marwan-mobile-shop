@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     await initDb();
     await ensureAdmin();
 
-    const { username, password } = req.body || {};
+    const username = String(req.body?.username ?? "").trim();
+    const password = String(req.body?.password ?? "").trim();
 
     if (!username || !password) {
       return res.status(400).json({

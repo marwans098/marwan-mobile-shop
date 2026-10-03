@@ -19,9 +19,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ")
-      ? auth.slice(7).trim()
+    const authHeader =
+      req.headers.authorization || req.headers.Authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
       : "";
 
     const user = await getUserByToken(token);

@@ -1,20 +1,40 @@
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.POSTGRES_URL_NO_SSL ||
-  process.env.NEON_DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("لم يتم العثور على رابط قاعدة البيانات");
+function getConnectionString() {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NO_SSL ||
+    process.env.NEON_DATABASE_URL ||
+    null
+  );
 }
 
-export const sql = neon(connectionString);
+let sqlClient = null;
+
+function getSql() {
+  const connectionString = getConnectionString();
+
+  if (!connectionString) {
+    throw new Error("لم يتم العثور على رابط قاعدة البيانات");
+  }
+
+  if (!sqlClient) {
+    sqlClient = neon(connectionString);
+  }
+
+  return sqlClient;
+}
+
+export function sql(strings, ...values) {
+  return getSql()(strings, ...values);
+}
 
 export async function initDb() {
-  await sql`
+  const db = getSql();
+
+  await db`
     CREATE TABLE IF NOT EXISTS app_state (
       id INTEGER PRIMARY KEY,
       data JSONB NOT NULL,
@@ -22,7 +42,7 @@ export async function initDb() {
     )
   `;
 
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS app_users (
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
@@ -33,7 +53,7 @@ export async function initDb() {
     )
   `;
 
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS app_sessions (
       token TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL,
@@ -43,12 +63,13 @@ export async function initDb() {
 }
 
 export async function ensureAdmin() {
-  const result = await sql`
+  const db = getSql();
+  const result = await db`
     SELECT id FROM app_users WHERE username = 'admin' LIMIT 1
   `;
 
   if (result.length === 0) {
-    await sql`
+    await db`
       INSERT INTO app_users
         (username, name, role, password, permissions)
       VALUES
@@ -64,9 +85,10 @@ export async function ensureAdmin() {
 }
 
 export async function createSession(userId) {
+  const db = getSql();
   const token = crypto.randomBytes(32).toString("hex");
 
-  await sql`
+  await db`
     INSERT INTO app_sessions
       (token, user_id, expires_at)
     VALUES
@@ -77,13 +99,16 @@ export async function createSession(userId) {
 }
 
 export async function getUserByToken(token) {
-  if (!token) return null;
+  const normalizedToken = String(token ?? "").trim();
 
-  const result = await sql`
+  if (!normalizedToken) return null;
+
+  const db = getSql();
+  const result = await db`
     SELECT u.id, u.username, u.name, u.role, u.permissions
     FROM app_sessions s
     JOIN app_users u ON u.id = s.user_id
-    WHERE s.token = ${token}
+    WHERE s.token = ${normalizedToken}
       AND s.expires_at > NOW()
     LIMIT 1
   `;

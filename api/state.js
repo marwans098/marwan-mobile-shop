@@ -4,9 +4,10 @@ export default async function handler(req, res) {
   try {
     await initDb();
 
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ")
-      ? auth.slice(7)
+    const authHeader =
+      req.headers.authorization || req.headers.Authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
       : null;
 
     const user = await getUserByToken(token);
